@@ -141,7 +141,9 @@ public class ToolRequiredPlugin extends Plugin
 		MenuEntry[] entries = root.getMenuEntries();
 
 		for (MenuEntry entry : entries) {
-			if (config.chopDown() && (entry.getOption().equals("Chop down") || entry.getOption().equals("Chop-down")) && !ANY_AXE.fulfilledBy(playerItems)) {
+			if (config.chopDown() && (entry.getOption().equals("Chop down") ||
+									  entry.getOption().equals("Chop-down") ||
+									  entry.getOption().equals("Chop Sapling")) && !ANY_AXE.fulfilledBy(playerItems)) {
 				root.removeMenuEntry(entry);
 			}
 			else if (config.mine() && entry.getOption().equals("Mine") && !ANY_PICKAXE.fulfilledBy(playerItems)) {
