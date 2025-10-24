@@ -4,13 +4,7 @@ import com.google.common.collect.Sets;
 import com.google.inject.Provides;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.InventoryID;
-import net.runelite.api.Item;
-import net.runelite.api.ItemContainer;
-import net.runelite.api.ItemID;
-import net.runelite.api.Menu;
-import net.runelite.api.MenuEntry;
+import net.runelite.api.*;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.client.config.ConfigManager;
@@ -18,6 +12,8 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.cluescrolls.clues.item.AnyRequirementCollection;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.api.events.GameStateChanged;
 
 import javax.inject.Inject;
 import java.util.Set;
@@ -39,6 +35,9 @@ public class ToolRequiredPlugin extends Plugin
 	@Inject
 	private ToolRequiredConfig config;
 
+    @Inject
+    private ChatMessageManager chatMessageManager;
+
 	@Provides
 	ToolRequiredConfig provideConfig(ConfigManager configManager)
 	{
@@ -53,6 +52,11 @@ public class ToolRequiredPlugin extends Plugin
 
 	@Getter
 	private Item[] playerItems;
+
+    private static final String PLUGIN_VERSION = "1.1.8";
+
+    @Getter
+    private String loginMessage = "Tool Required plugin v" + PLUGIN_VERSION;
 
 	private static final AnyRequirementCollection ANY_AXE = any("Any Axe",
 			item(ItemID.IRON_AXE),
@@ -195,4 +199,15 @@ public class ToolRequiredPlugin extends Plugin
             }
 		}
 	}
+
+    @Subscribe
+    public void onGameStateChanged(GameStateChanged event) {
+        // listen for game state changes
+        GameState state = event.getGameState();
+
+        // detect login event AND check loginMessage is True - send login message with version number
+        if (state == GameState.LOGGED_IN && config.loginMessage()) {
+            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", loginMessage, null);
+        }
+    }
 }

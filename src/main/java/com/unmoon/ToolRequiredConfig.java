@@ -28,4 +28,11 @@ public interface ToolRequiredConfig extends Config
     )
     default boolean farm() {return true;}
 
+    @ConfigItem(
+            keyName = "loginMessage",
+            name = "Login Message",
+            description = "Login message informing you of any plugin updates."
+    )
+    default boolean loginMessage() {return true;}
+
 }
