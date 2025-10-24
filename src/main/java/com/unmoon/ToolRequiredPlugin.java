@@ -53,7 +53,7 @@ public class ToolRequiredPlugin extends Plugin
 	@Getter
 	private Item[] playerItems;
 
-    private static final String PLUGIN_VERSION = "1.1.8";
+    private static final String PLUGIN_VERSION = "1.1.9";
 
     @Getter
     private String loginMessage = "Tool Required plugin v" + PLUGIN_VERSION;
