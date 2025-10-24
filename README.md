@@ -1,4 +1,4 @@
 # Tool Required
 Remove menu entries if required tool is missing.
 
-Supports trees (axes) and rocks (pickaxes).
+Supports trees (axes), rocks (pickaxes), and farming (magic secateurs).
