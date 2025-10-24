@@ -122,11 +122,17 @@ public class ToolRequiredPlugin extends Plugin
 			item(ItemID.INFERNAL_PICKAXE_UNCHARGED_30346),
 			item(ItemID.DRAGON_PICKAXE_OR_30351)
 	);
+
+    private static final AnyRequirementCollection MAGIC_SECATEURS = any("Magic secateurs", item(ItemID.MAGIC_SECATEURS));
+
 	private final Set<String> cutOverrides = Sets.newHashSet("Sulliuscep");
 	private final Set<String> chopOverrides = Sets.newHashSet(
 			"Jungle Bush", "Pineapple plant", "Canoe Station", "Vines", "Tendrils", "Bruma roots",
 			"Rotten sapling", "Sapling", "Thick vine", "Thick vines", "Corrupt Phren Roots", "Phren Roots"
 	);
+    private final Set<String> farmingOverrides = Sets.newHashSet("Herbs", "Potato", "Onion", "Cabbages",
+            "Tomato", "Sweetcorn", "Strawberry", "Watermelon", "Snape grass plant", "Celastrus tree", "Grape vine", "bush",
+            "Limpwurt", "Hops", "Jute", "Barley");
 
 	@Subscribe
 	public void onItemContainerChanged(final ItemContainerChanged event)
@@ -178,6 +184,15 @@ public class ToolRequiredPlugin extends Plugin
 			if (config.mine() && entry.getOption().equals("Mine") && !ANY_PICKAXE.fulfilledBy(playerItems)) {
 				root.removeMenuEntry(entry);
 			}
+            // Check if farming is enabled, and check if player has magic secateurs
+            if (config.farm() && !MAGIC_SECATEURS.fulfilledBy(playerItems)) {
+                String target = removeTags(entry.getTarget());
+                // entry option starts with Pick OR Harvest AND contains one of the items affected by the secateurs
+                if ((entry.getOption().startsWith("Pick") || entry.getOption().startsWith("Harvest"))
+                        && farmingOverrides.stream().anyMatch(target::contains)) {
+                    root.removeMenuEntry(entry);
+                }
+            }
 		}
 	}
 }

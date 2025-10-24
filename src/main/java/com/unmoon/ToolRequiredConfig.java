@@ -21,4 +21,11 @@ public interface ToolRequiredConfig extends Config
 	)
 	default boolean mine() {return true;}
 
+    @ConfigItem(
+            keyName = "farming",
+            name = "Remove Farming",
+            description = "Remove Pick and Harvest option from relevant patches if you have no magic secateurs."
+    )
+    default boolean farm() {return true;}
+
 }
