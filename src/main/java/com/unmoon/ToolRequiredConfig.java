@@ -35,4 +35,12 @@ public interface ToolRequiredConfig extends Config
     )
     default boolean loginMessage() {return true;}
 
+    @ConfigItem(
+            keyName = "pluginVersion",
+            name = "Plugin Version",
+            description = "The version of the plugin currently running.",
+            hidden = true
+    )
+    default String pluginVersion() {return "1.1.9";}
+
 }

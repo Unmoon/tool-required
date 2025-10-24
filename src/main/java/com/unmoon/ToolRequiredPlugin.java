@@ -53,11 +53,6 @@ public class ToolRequiredPlugin extends Plugin
 	@Getter
 	private Item[] playerItems;
 
-    private static final String PLUGIN_VERSION = "1.1.9";
-
-    @Getter
-    private String loginMessage = "Tool Required plugin v" + PLUGIN_VERSION;
-
 	private static final AnyRequirementCollection ANY_AXE = any("Any Axe",
 			item(ItemID.IRON_AXE),
 			item(ItemID.BRONZE_AXE),
@@ -207,7 +202,8 @@ public class ToolRequiredPlugin extends Plugin
 
         // detect login event AND check loginMessage is True - send login message with version number
         if (state == GameState.LOGGED_IN && config.loginMessage()) {
-            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", loginMessage, null);
+            String message = "Tool Required plugin v" + config.pluginVersion();
+            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", message, null);
         }
     }
 }
