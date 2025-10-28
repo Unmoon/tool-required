@@ -11,15 +11,21 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.ItemID;
 import net.runelite.api.Menu;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.GameState;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.PostMenuSort;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.cluescrolls.clues.item.AnyRequirementCollection;
 
 import javax.inject.Inject;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 import static net.runelite.api.MenuAction.GAME_OBJECT_FIRST_OPTION;
@@ -35,6 +41,9 @@ public class ToolRequiredPlugin extends Plugin
 {
 	@Inject
 	private Client client;
+
+	@Inject
+	private ConfigManager configManager;
 
 	@Inject
 	private ToolRequiredConfig config;
@@ -126,7 +135,7 @@ public class ToolRequiredPlugin extends Plugin
 			item(ItemID.DRAGON_PICKAXE_OR_30351)
 	);
 
-    private static final AnyRequirementCollection MAGIC_SECATEURS = any("Magic secateurs", item(ItemID.MAGIC_SECATEURS));
+    private static final AnyRequirementCollection ANY_FARMING = any("Any Farming", item(ItemID.MAGIC_SECATEURS), item(ItemID.SPADE), item(ItemID.RAKE));
 
 	private final Set<String> cutOverrides = Sets.newHashSet("Sulliuscep");
 	private final Set<String> chopOverrides = Sets.newHashSet(
@@ -136,6 +145,13 @@ public class ToolRequiredPlugin extends Plugin
     private final Set<String> farmingOverrides = Sets.newHashSet("Herbs", "Potato", "Onion", "Cabbages",
             "Tomato", "Sweetcorn", "Strawberry", "Watermelon", "Snape grass plant", "Celastrus tree", "Grape vine", "bush",
             "Limpwurt", "Hops", "Jute", "Barley");
+
+	private static final Map<String, String> VERSION_UPDATES = new LinkedHashMap<>();
+	static {
+		VERSION_UPDATES.put("1.2.0", "Farming patches functionality added for spade, rake, and magic secateurs");
+		VERSION_UPDATES.put("1.2.1", "new change");
+		VERSION_UPDATES.put("1.2.2", "another new change");
+	}
 
 	@Subscribe
 	public void onItemContainerChanged(final ItemContainerChanged event)
@@ -188,7 +204,7 @@ public class ToolRequiredPlugin extends Plugin
 				root.removeMenuEntry(entry);
 			}
             // Check if farming is enabled, and check if player has magic secateurs
-            if (config.farm() && !MAGIC_SECATEURS.fulfilledBy(playerItems)) {
+            if (config.farm() && !ANY_FARMING.fulfilledBy(playerItems)) {
                 String target = removeTags(entry.getTarget());
                 // entry option starts with Pick OR Harvest AND contains one of the items affected by the secateurs
                 if ((entry.getOption().startsWith("Pick") || entry.getOption().startsWith("Harvest"))
@@ -204,10 +220,73 @@ public class ToolRequiredPlugin extends Plugin
         // listen for game state changes
         GameState state = event.getGameState();
 
-        // detect login event AND check loginMessage is True - send login message with version number
-        if (state == GameState.LOGGED_IN && config.loginMessage()) {
-            String message = "Tool Required plugin v" + config.pluginVersion();
+        if (state == GameState.LOGGED_IN) {
+			// retrieve last version seen from config
+			// check if any newer version than it in the map
+			//
+			// If so -
+			// if a version is newer, add the value for the key to the string
+			// do this for multiple version if there are such as 1.2.0 and 1.2.1 when last acknowledged 1.1.9
+			// append the click here portion of the message after
+			//
+			// Once done building any login message string if required, publish it to chat box
+			// listen for the click event if user clicks to acknowledge update message
+			// if they click, we change the lastVersionSeen value in config with the latest version in the map
+			//
+			// if not -
+			// continue
+            String message = "Tool Required updated: " + config.lastVersionSeen();
             client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", message, null);
         }
     }
+
+	// TODO make chat click listener logic
+	// @Subscribe
+	// public void onChatMessage
+
+	public boolean hasUnseenUpdates() {
+		String lastVersionSeen = config.lastVersionSeen();
+		String latestVersion = getLatestVersion();
+		
+		// If last seen equals latest in map, no unseen updates - you have told me linkedhashmap preserves insertion order the other day
+		return !latestVersion.equals(lastVersionSeen);
+	}
+
+	public String getLatestVersion() {
+		String latest = "";
+		for (String version : VERSION_UPDATES.keySet()) {
+			latest = version;
+		}
+		return latest;
+	}
+
+	public String buildLoginMessage() {
+		String lastVersionSeen = config.lastVersionSeen();
+		StringBuilder message = new StringBuilder();
+
+		// if the last version seen is empty - load all the version messages because this means they have seen none
+		boolean foundLastSeen = lastVersionSeen.isEmpty();
+		
+		for (Map.Entry<String, String> entry : VERSION_UPDATES.entrySet()) {
+			String version = entry.getKey();
+			String changeMessage = entry.getValue();
+			
+			// If we found the last seen version, start collecting messages after it
+			if (foundLastSeen) {
+				message.append(changeMessage).append(". ");
+			}
+			
+			// mark that we found the last seen version
+			if (version.equals(lastVersionSeen)) {
+				foundLastSeen = true;
+			}
+		}
+		
+		message.append("Click here to acknowledge this message.");
+		return message.toString().trim();
+	}
+
+	public void updateLastVersionSeen() {
+		configManager.setConfiguration("tool-required", "lastVersionSeen", getLatestVersion());
+	}
 }

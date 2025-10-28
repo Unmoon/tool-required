@@ -29,18 +29,11 @@ public interface ToolRequiredConfig extends Config
     default boolean farm() {return true;}
 
     @ConfigItem(
-            keyName = "loginMessage",
-            name = "Login Message",
-            description = "Login message informing you of any plugin updates."
-    )
-    default boolean loginMessage() {return true;}
-
-    @ConfigItem(
-            keyName = "pluginVersion",
-            name = "Plugin Version",
-            description = "The version of the plugin currently running.",
+            keyName = "lastVersionSeen",
+            name = "Last Version Seen",
+            description = "The last plugin version login message the user acknowledged.",
             hidden = true
     )
-    default String pluginVersion() {return "1.1.9";}
+    default String lastVersionSeen() {return "";}
 
 }
