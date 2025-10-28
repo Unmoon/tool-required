@@ -16,9 +16,11 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.cluescrolls.clues.item.AnyRequirementCollection;
@@ -153,6 +155,8 @@ public class ToolRequiredPlugin extends Plugin
 		VERSION_UPDATES.put("1.2.2", "another new change");
 	}
 
+	private String activeLoginMessage = null;
+
 	@Subscribe
 	public void onItemContainerChanged(final ItemContainerChanged event)
 	{
@@ -215,36 +219,70 @@ public class ToolRequiredPlugin extends Plugin
 		}
 	}
 
-    @Subscribe
-    public void onGameStateChanged(GameStateChanged event) {
-        // listen for game state changes
-        GameState state = event.getGameState();
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		GameState state = event.getGameState();
 
-        if (state == GameState.LOGGED_IN) {
-			// retrieve last version seen from config
-			// check if any newer version than it in the map
-			//
-			// If so -
-			// if a version is newer, add the value for the key to the string
-			// do this for multiple version if there are such as 1.2.0 and 1.2.1 when last acknowledged 1.1.9
-			// append the click here portion of the message after
-			//
-			// Once done building any login message string if required, publish it to chat box
-			// listen for the click event if user clicks to acknowledge update message
-			// if they click, we change the lastVersionSeen value in config with the latest version in the map
-			//
-			// if not -
-			// continue
-            String message = "Tool Required updated: " + config.lastVersionSeen();
-            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", message, null);
-        }
-    }
+		if (state == GameState.LOGGED_IN)
+		{
+			if (hasUnseenUpdates())
+			{
+				// make and send message
+				activeLoginMessage = buildLoginMessage();
+				chatMessageManager.queue(
+					QueuedMessage.builder()
+						.type(ChatMessageType.GAMEMESSAGE)
+						.runeLiteFormattedMessage(activeLoginMessage)
+						.build()
+				);
 
-	// TODO make chat click listener logic
-	// @Subscribe
-	// public void onChatMessage
+				log.debug("Displayed update message for unseen version(s).");
+			}
+			else
+			{
+				activeLoginMessage = null;
+				log.debug("No unseen updates.");
+			}
+		}
+	}
 
-	public boolean hasUnseenUpdates() {
+	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		// escape early if noise
+		if (activeLoginMessage == null)
+		{
+			return;
+		}
+
+		// check if clicked message matches active login message
+		String msg = removeTags(event.getMessage());
+    	String target = removeTags(activeLoginMessage);
+
+		// check if message is same
+		if (msg.contains(target))
+		{
+			// user has acknowledged update message
+			updateLastVersionSeen();
+
+			log.debug("User acknowledged update message; version marked as seen.");
+
+			// clear active message so we don't repeatedly process clicks
+			activeLoginMessage = null;
+
+			// thank the user
+			chatMessageManager.queue(
+				QueuedMessage.builder()
+					.type(ChatMessageType.GAMEMESSAGE)
+					.runeLiteFormattedMessage("Thanks for acknowledging the update!")
+					.build()
+			);
+		}
+	}
+
+	public boolean hasUnseenUpdates() 
+	{
 		String lastVersionSeen = config.lastVersionSeen();
 		String latestVersion = getLatestVersion();
 		
@@ -252,41 +290,42 @@ public class ToolRequiredPlugin extends Plugin
 		return !latestVersion.equals(lastVersionSeen);
 	}
 
-	public String getLatestVersion() {
-		String latest = "";
-		for (String version : VERSION_UPDATES.keySet()) {
-			latest = version;
-		}
-		return latest;
+	public String getLatestVersion() 
+	{
+		// Get the latest version by taking the last key in the map
+		return VERSION_UPDATES.keySet().stream()
+				.reduce((first, second) -> second)
+				.orElse("");
 	}
 
-	public String buildLoginMessage() {
+	public String buildLoginMessage() 
+	{
 		String lastVersionSeen = config.lastVersionSeen();
 		StringBuilder message = new StringBuilder();
-
-		// if the last version seen is empty - load all the version messages because this means they have seen none
 		boolean foundLastSeen = lastVersionSeen.isEmpty();
-		
+
 		for (Map.Entry<String, String> entry : VERSION_UPDATES.entrySet()) {
 			String version = entry.getKey();
 			String changeMessage = entry.getValue();
-			
-			// If we found the last seen version, start collecting messages after it
+
 			if (foundLastSeen) {
-				message.append(changeMessage).append(". ");
+				message.append("Tool Required updated: ");
+				message.append(changeMessage).append(" ");
 			}
-			
-			// mark that we found the last seen version
+
+			// Mark that we found the last seen version
 			if (version.equals(lastVersionSeen)) {
 				foundLastSeen = true;
 			}
 		}
-		
-		message.append("Click here to acknowledge this message.");
+
+		// add acknowledge message
+		message.append("Click here to acknowledge these updates.");
 		return message.toString().trim();
 	}
 
-	public void updateLastVersionSeen() {
+	public void updateLastVersionSeen() 
+	{
 		configManager.setConfiguration("tool-required", "lastVersionSeen", getLatestVersion());
 	}
 }
