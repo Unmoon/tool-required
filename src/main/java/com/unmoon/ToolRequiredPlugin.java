@@ -16,7 +16,7 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.ChatMessage;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.chat.ChatMessageManager;
@@ -151,11 +151,7 @@ public class ToolRequiredPlugin extends Plugin
 	private static final Map<String, String> VERSION_UPDATES = new LinkedHashMap<>();
 	static {
 		VERSION_UPDATES.put("1.2.0", "Farming patches functionality added for spade, rake, and magic secateurs");
-		VERSION_UPDATES.put("1.2.1", "new change");
-		VERSION_UPDATES.put("1.2.2", "another new change");
 	}
-
-	private String activeLoginMessage = null;
 
 	@Subscribe
 	public void onItemContainerChanged(final ItemContainerChanged event)
@@ -228,12 +224,15 @@ public class ToolRequiredPlugin extends Plugin
 		{
 			if (hasUnseenUpdates())
 			{
-				// make and send message
-				activeLoginMessage = buildLoginMessage();
+				// acknowledgeUpdate to false to show user they need to acknowledge
+				configManager.setConfiguration("tool-required", "acknowledgeUpdate", false);
+				
+				// update message
+				String updateMessage = buildLoginMessage();
 				chatMessageManager.queue(
 					QueuedMessage.builder()
 						.type(ChatMessageType.GAMEMESSAGE)
-						.runeLiteFormattedMessage(activeLoginMessage)
+						.runeLiteFormattedMessage(updateMessage)
 						.build()
 				);
 
@@ -241,43 +240,37 @@ public class ToolRequiredPlugin extends Plugin
 			}
 			else
 			{
-				activeLoginMessage = null;
 				log.debug("No unseen updates.");
 			}
 		}
 	}
 
 	@Subscribe
-	public void onChatMessage(ChatMessage event)
+	public void onConfigChanged(ConfigChanged event)
 	{
-		// escape early if noise
-		if (activeLoginMessage == null)
+		// only caring about changes to our plugin's config
+		if (!event.getGroup().equals("tool-required"))
 		{
 			return;
 		}
 
-		// check if clicked message matches active login message
-		String msg = removeTags(event.getMessage());
-    	String target = removeTags(activeLoginMessage);
-
-		// check if message is same
-		if (msg.contains(target))
+		// acknowledgeUpdate checkbox was changed
+		if (event.getKey().equals("acknowledgeUpdate"))
 		{
-			// user has acknowledged update message
-			updateLastVersionSeen();
-
-			log.debug("User acknowledged update message; version marked as seen.");
-
-			// clear active message so we don't repeatedly process clicks
-			activeLoginMessage = null;
-
-			// thank the user
-			chatMessageManager.queue(
-				QueuedMessage.builder()
-					.type(ChatMessageType.GAMEMESSAGE)
-					.runeLiteFormattedMessage("Thanks for acknowledging the update!")
-					.build()
-			);
+			if (Boolean.parseBoolean(event.getNewValue()))
+			{
+				updateLastVersionSeen();
+				
+				log.debug("User acknowledged update via config checkbox.");
+				
+				// Send thank you message
+				chatMessageManager.queue(
+					QueuedMessage.builder()
+						.type(ChatMessageType.GAMEMESSAGE)
+						.runeLiteFormattedMessage("Thanks for acknowledging the update!")
+						.build()
+				);
+			}
 		}
 	}
 
@@ -302,26 +295,33 @@ public class ToolRequiredPlugin extends Plugin
 	{
 		String lastVersionSeen = config.lastVersionSeen();
 		StringBuilder message = new StringBuilder();
+		message.append("Tool Required updated: ");
 		boolean foundLastSeen = lastVersionSeen.isEmpty();
+		boolean hasChanges = false;
 
 		for (Map.Entry<String, String> entry : VERSION_UPDATES.entrySet()) {
 			String version = entry.getKey();
 			String changeMessage = entry.getValue();
 
-			if (foundLastSeen) {
-				message.append("Tool Required updated: ");
-				message.append(changeMessage).append(" ");
-			}
 
-			// Mark that we found the last seen version
 			if (version.equals(lastVersionSeen)) {
 				foundLastSeen = true;
+				// we don't want to include this version again
+				continue;
+			}
+
+			if (foundLastSeen) {
+				if (hasChanges) {
+					message.append("; ");
+				}
+				message.append(changeMessage);
+				hasChanges = true;
 			}
 		}
 
-		// add acknowledge message
-		message.append("Click here to acknowledge these updates.");
-		return message.toString().trim();
+		// add instruction to acknowledge via config
+		message.append(". Please open the plugin config and check the 'Acknowledge Update' box.");
+		return message.toString();
 	}
 
 	public void updateLastVersionSeen() 
