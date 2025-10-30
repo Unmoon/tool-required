@@ -14,12 +14,11 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.GameState;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.ScriptEvent;
-import net.runelite.api.events.ChatMessage;
-import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
@@ -173,11 +172,8 @@ public class ToolRequiredPlugin extends Plugin
 	// logged in counter to only send message once
 	int initializeTracker;
 
-	// only activate the messages if last seen version is not latest version
-	boolean runConfigCheck = false;
-
-	// value assigned after a chat message fires to have the first client tick available move the clickbox
-	boolean runAssignment = true;
+	// only activate the changelog message if last seen version is not latest version
+	boolean runConfigCheck;
 
 	@Subscribe
 	public void onItemContainerChanged(final ItemContainerChanged event)
@@ -275,60 +271,50 @@ public class ToolRequiredPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onClientTick(ClientTick e)
+	public void onScriptPostFired(ScriptPostFired e)
 	{
-		// if no new message exists then don't run the assignment/unassignment of the clickable message
-		if (!runConfigCheck || !runAssignment)
+		// script id 84 is ChatBuilder script
+		if (e.getScriptId() != 84)
 		{
 			return;
 		}
-		clientThread.invokeLater(() -> {
-			Widget chatWidget = client.getWidget(InterfaceID.Chatbox.SCROLLAREA);
 
-			if (chatWidget != null)
+		if (!runConfigCheck)
+		{
+			return;
+		}
+
+		Widget chatWidget = client.getWidget(InterfaceID.Chatbox.SCROLLAREA);
+
+		if (chatWidget != null)
+		{
+			for (int i = 0; i < chatWidget.getDynamicChildren().length; i++)
 			{
-				for (int i = chatWidget.getDynamicChildren().length - 1; i >= 0; i--)
+				Widget child = chatWidget.getDynamicChildren()[i];
+				String text = Text.removeTags(child.getText());
+				if (text.isEmpty())
 				{
-					Widget child = chatWidget.getDynamicChildren()[i];
-					String text = Text.removeTags(child.getText());
-					if (text.isEmpty())
-					{
-						continue;
-					}
-					if (text.contains("Tool Required updated: "))
-					{
-						clientThread.invokeLater(() -> {
-							child.setAction(1, "Acknowledged Changelog");
-							child.setOnOpListener((JavaScriptCallback) this::click);
-							child.setHasListener(true);
-							child.setNoClickThrough(true);
-							child.revalidate();
-						});
-					}
-					else
-					{
-
-						// have to reset the click boxes on the widget, lol.
-						clientThread.invokeLater(() -> {
-							child.setHasListener(false);
-							child.setNoClickThrough(false);
-							child.revalidate();
+					continue;
+				}
+				if (text.contains("Tool Required updated: "))
+				{
+					clientThread.invokeLater(() -> {
+						child.setAction(1, "Acknowledged Changelog");
+						child.setOnOpListener((JavaScriptCallback) this::click);
+						child.setHasListener(true);
+						child.setNoClickThrough(true);
+						child.revalidate();
+					});
+				}
+				else
+				{
+					clientThread.invokeLater(() -> {
+						child.setHasListener(false);
+						child.setNoClickThrough(false);
+						child.revalidate();
 						});
 					}
 				}
-				// prevent script from running over and over
-				runAssignment = false;
-			}
-		});
-	}
-
-	@Subscribe
-	private void onChatMessage(ChatMessage chatMessage)
-	{
-		// every message moves the clickable link
-		if (runConfigCheck)
-		{
-			runAssignment = true;
 		}
 	}
 
@@ -406,5 +392,7 @@ public class ToolRequiredPlugin extends Plugin
 	public void resetConfiguration()
 	{
 		configManager.setConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_SEEN_VERSION, "0.0");
+		initializeTracker = 2;
+		runConfigCheck = true;
 	}
 }
