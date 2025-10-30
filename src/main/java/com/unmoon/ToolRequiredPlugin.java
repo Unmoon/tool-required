@@ -331,7 +331,7 @@ public class ToolRequiredPlugin extends Plugin
 
 			if (chatWidget != null)
 			{
-				for (int i = chatWidget.getDynamicChildren().length - 1; i >= 0 && runConfigCheck; i--)
+				for (int i = 0; i < chatWidget.getDynamicChildren().length; i++)
 				{
 					Widget child = chatWidget.getDynamicChildren()[i];
 					child.setHasListener(false);
