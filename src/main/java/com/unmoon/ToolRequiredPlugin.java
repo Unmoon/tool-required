@@ -13,10 +13,16 @@ import net.runelite.api.Menu;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.GameState;
 import net.runelite.api.ChatMessageType;
+import net.runelite.api.ScriptEvent;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.GameStateChanged;
-import net.runelite.client.events.ConfigChanged;
+import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.JavaScriptCallback;
+import net.runelite.api.widgets.Widget;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.chat.ChatMessageManager;
@@ -33,6 +39,7 @@ import java.util.Set;
 import static net.runelite.api.MenuAction.GAME_OBJECT_FIRST_OPTION;
 import static net.runelite.client.plugins.cluescrolls.clues.item.ItemRequirements.any;
 import static net.runelite.client.plugins.cluescrolls.clues.item.ItemRequirements.item;
+import net.runelite.client.util.Text;
 import static net.runelite.client.util.Text.removeTags;
 
 @Slf4j
@@ -52,6 +59,9 @@ public class ToolRequiredPlugin extends Plugin
 
     @Inject
     private ChatMessageManager chatMessageManager;
+
+	@Inject
+	private ClientThread clientThread;
 
 	@Provides
 	ToolRequiredConfig provideConfig(ConfigManager configManager)
@@ -137,7 +147,11 @@ public class ToolRequiredPlugin extends Plugin
 			item(ItemID.DRAGON_PICKAXE_OR_30351)
 	);
 
-    private static final AnyRequirementCollection ANY_FARMING = any("Any Farming", item(ItemID.MAGIC_SECATEURS), item(ItemID.SPADE), item(ItemID.RAKE));
+    private static final AnyRequirementCollection ANY_FARMING = any("Any Farming",
+		item(ItemID.MAGIC_SECATEURS),
+		item(ItemID.SPADE),
+		item(ItemID.RAKE)
+	);
 
 	private final Set<String> cutOverrides = Sets.newHashSet("Sulliuscep");
 	private final Set<String> chopOverrides = Sets.newHashSet(
@@ -148,10 +162,18 @@ public class ToolRequiredPlugin extends Plugin
             "Tomato", "Sweetcorn", "Strawberry", "Watermelon", "Snape grass plant", "Celastrus tree", "Grape vine", "bush",
             "Limpwurt", "Hops", "Jute", "Barley");
 
-	private static final Map<String, String> VERSION_UPDATES = new LinkedHashMap<>();
+	// linked hashmap to preserver order of updates
+	// using Double as key to compare to versions, version doesn't quite support 1.2.0 semantic versioning, but allows multiple changes to be displayed.
+	private static final LinkedHashMap<Double, String> VERSION_UPDATES = new LinkedHashMap<>();
 	static {
-		VERSION_UPDATES.put("1.2.0", "Farming patches functionality added for spade, rake, and magic secateurs");
+		VERSION_UPDATES.put(1.20, "Farming patches functionality added for spade, rake, and magic secateurs");
 	}
+
+	// logged in counter to only send message once
+	int initializeTracker;
+
+	// only activate the changelog message if last seen version is not latest version
+	boolean runConfigCheck;
 
 	@Subscribe
 	public void onItemContainerChanged(final ItemContainerChanged event)
@@ -170,6 +192,13 @@ public class ToolRequiredPlugin extends Plugin
 			System.arraycopy(equippedItems, 0, playerItems, 0, equippedItems.length);
 			System.arraycopy(inventoryItems, 0, playerItems, equippedItems.length, inventoryItems.length);
 		}
+	}
+
+	@Override
+	public void startUp()
+	{
+		runConfigCheck = hasUnseenUpdates();
+		initializeTracker = 2;
 	}
 
 	@Subscribe
@@ -218,114 +247,152 @@ public class ToolRequiredPlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		GameState state = event.getGameState();
-
-		if (state == GameState.LOGGED_IN)
+		if (event.getGameState() == GameState.LOGGING_IN)
 		{
-			if (hasUnseenUpdates())
-			{
-				// acknowledgeUpdate to false to show user they need to acknowledge
-				configManager.setConfiguration("tool-required", "acknowledgeUpdate", false);
-				
-				// update message
-				String updateMessage = buildLoginMessage();
-				chatMessageManager.queue(
-					QueuedMessage.builder()
-						.type(ChatMessageType.GAMEMESSAGE)
-						.runeLiteFormattedMessage(updateMessage)
-						.build()
-				);
-
-				log.debug("Displayed update message for unseen version(s).");
-			}
-			else
-			{
-				log.debug("No unseen updates.");
-			}
+			initializeTracker = 2;
 		}
 	}
 
 	@Subscribe
-	public void onConfigChanged(ConfigChanged event)
+	public void onGameTick(GameTick e)
 	{
-		// only caring about changes to our plugin's config
-		if (!event.getGroup().equals("tool-required"))
+		if (runConfigCheck && initializeTracker > 0 && --initializeTracker == 0)
+		{
+			String updateMessage = buildLoginMessage();
+
+			chatMessageManager.queue(
+				QueuedMessage.builder()
+				.type(ChatMessageType.CONSOLE)
+				.sender("Tool Required updated")
+				.runeLiteFormattedMessage(updateMessage)
+				.build()
+			);
+		}
+	}
+
+	@Subscribe
+	public void onScriptPostFired(ScriptPostFired e)
+	{
+		// script id 84 is ChatBuilder script
+		if (e.getScriptId() != 84)
 		{
 			return;
 		}
 
-		// acknowledgeUpdate checkbox was changed
-		if (event.getKey().equals("acknowledgeUpdate"))
+		if (!runConfigCheck)
 		{
-			if (Boolean.parseBoolean(event.getNewValue()))
-			{
-				updateLastVersionSeen();
-				
-				log.debug("User acknowledged update via config checkbox.");
-				
-				// Send thank you message
-				chatMessageManager.queue(
-					QueuedMessage.builder()
-						.type(ChatMessageType.GAMEMESSAGE)
-						.runeLiteFormattedMessage("Thanks for acknowledging the update!")
-						.build()
-				);
-			}
+			return;
 		}
+
+		Widget chatWidget = client.getWidget(InterfaceID.Chatbox.SCROLLAREA);
+
+		if (chatWidget != null)
+		{
+			for (int i = 0; i < chatWidget.getDynamicChildren().length; i++)
+			{
+				Widget child = chatWidget.getDynamicChildren()[i];
+				String text = Text.removeTags(child.getText());
+				if (text.isEmpty())
+				{
+					continue;
+				}
+				if (text.contains("Tool Required updated: "))
+				{
+					clientThread.invokeLater(() -> {
+						child.setAction(1, "Acknowledged Changelog");
+						child.setOnOpListener((JavaScriptCallback) this::click);
+						child.setHasListener(true);
+						child.setNoClickThrough(true);
+						child.revalidate();
+					});
+				}
+				else
+				{
+					clientThread.invokeLater(() -> {
+						child.setHasListener(false);
+						child.setNoClickThrough(false);
+						child.revalidate();
+						});
+					}
+				}
+		}
+	}
+
+	protected void click(ScriptEvent ev)
+	{
+		updateLastVersionSeen();
+		chatMessageManager.queue(QueuedMessage.builder()
+			.type(ChatMessageType.CONSOLE)
+			.runeLiteFormattedMessage("Acknowledged the changelog.")
+			.build());
+
+		clientThread.invoke(() -> {
+			Widget chatWidget = client.getWidget(InterfaceID.Chatbox.SCROLLAREA);
+
+			if (chatWidget != null)
+			{
+				for (int i = 0; i < chatWidget.getDynamicChildren().length; i++)
+				{
+					Widget child = chatWidget.getDynamicChildren()[i];
+					child.setHasListener(false);
+					child.setNoClickThrough(false);
+					child.revalidate();
+				}
+			}
+		});
 	}
 
 	public boolean hasUnseenUpdates() 
 	{
-		String lastVersionSeen = config.lastVersionSeen();
-		String latestVersion = getLatestVersion();
+		Double lastVersionSeen = configManager.getConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_SEEN_VERSION, Double.class);
+		lastVersionSeen = lastVersionSeen == null ? 0.0 : lastVersionSeen;
+
+		Double latestVersion = getLatestVersion();
 		
 		// If last seen equals latest in map, no unseen updates - you have told me linkedhashmap preserves insertion order the other day
 		return !latestVersion.equals(lastVersionSeen);
 	}
 
-	public String getLatestVersion() 
+	public Double getLatestVersion()
 	{
 		// Get the latest version by taking the last key in the map
 		return VERSION_UPDATES.keySet().stream()
 				.reduce((first, second) -> second)
-				.orElse("");
+				.orElse(Double.valueOf(0));
 	}
 
 	public String buildLoginMessage() 
 	{
-		String lastVersionSeen = config.lastVersionSeen();
+		Double lastVersionSeen = Double.parseDouble(ToolRequiredConfig.LAST_SEEN_VERSION);
 		StringBuilder message = new StringBuilder();
 		message.append("Tool Required updated: ");
-		boolean foundLastSeen = lastVersionSeen.isEmpty();
-		boolean hasChanges = false;
 
-		for (Map.Entry<String, String> entry : VERSION_UPDATES.entrySet()) {
-			String version = entry.getKey();
+		for (Map.Entry<Double, String> entry : VERSION_UPDATES.entrySet()) {
+			Double version = entry.getKey();
 			String changeMessage = entry.getValue();
 
-
-			if (version.equals(lastVersionSeen)) {
-				foundLastSeen = true;
-				// we don't want to include this version again
-				continue;
-			}
-
-			if (foundLastSeen) {
-				if (hasChanges) {
-					message.append("; ");
-				}
+			if (version > lastVersionSeen)
+			{
 				message.append(changeMessage);
-				hasChanges = true;
 			}
 		}
 
 		// add instruction to acknowledge via config
-		message.append(". Please open the plugin config and check the 'Acknowledge Update' box.");
+		message.append(". Click this message to not see this message again");
 		return message.toString();
 	}
 
 	public void updateLastVersionSeen() 
 	{
-		configManager.setConfiguration("tool-required", "lastVersionSeen", getLatestVersion());
+		configManager.setConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_SEEN_VERSION, getLatestVersion());
+		runConfigCheck = false;
+	}
+
+	@Override
+	public void resetConfiguration()
+	{
+		configManager.setConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_SEEN_VERSION, "0.0");
+		initializeTracker = 2;
+		runConfigCheck = true;
 	}
 }
