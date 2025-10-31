@@ -332,11 +332,6 @@ public class ToolRequiredPlugin extends Plugin
 		});
 	}
 
-    public void updateLastVersionSeen()
-    {
-        versionManager.updateLastVersionSeen();
-    }
-
 	@Override
 	public void resetConfiguration()
 	{
