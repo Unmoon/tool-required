@@ -9,7 +9,6 @@ import net.runelite.client.config.ConfigItem;
 public interface ToolRequiredConfig extends Config
 {
 	String CONFIG_GROUP = "tool-required";
-	String LAST_SEEN_VERSION = "0.0";
 
 	@ConfigItem(
 		keyName = "chopDown",
@@ -31,5 +30,13 @@ public interface ToolRequiredConfig extends Config
 		description = "Remove Pick and Harvest option from relevant patches if you have no magic secateurs."
 	)
 	default boolean farm() {return true;}
+
+    @ConfigItem(
+            keyName = "lastVersionSeen",
+            name = "Last Version Seen",
+            description = "Last plugin message version acknowledged.",
+            hidden = true
+    )
+    default String lastVersionSeen() {return "";}
 
 }

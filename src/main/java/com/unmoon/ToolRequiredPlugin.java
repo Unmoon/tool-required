@@ -63,6 +63,9 @@ public class ToolRequiredPlugin extends Plugin
 	@Inject
 	private ClientThread clientThread;
 
+    @Inject
+    private VersionManager versionManager;
+
 	@Provides
 	ToolRequiredConfig provideConfig(ConfigManager configManager)
 	{
@@ -162,18 +165,6 @@ public class ToolRequiredPlugin extends Plugin
             "Tomato", "Sweetcorn", "Strawberry", "Watermelon", "Snape grass plant", "Celastrus tree", "Grape vine", "bush",
             "Limpwurt", "Hops", "Jute", "Barley");
 
-	// linked hashmap to preserver order of updates
-	// using Double as key to compare to versions, version doesn't quite support 1.2.0 semantic versioning, but allows multiple changes to be displayed.
-	private static final LinkedHashMap<Double, String> VERSION_UPDATES = new LinkedHashMap<>();
-	static {
-		VERSION_UPDATES.put(1.20, "Farming patches functionality added for spade, rake, and magic secateurs");
-	}
-
-	// logged in counter to only send message once
-	int initializeTracker;
-
-	// only activate the changelog message if last seen version is not latest version
-	boolean runConfigCheck;
 
 	@Subscribe
 	public void onItemContainerChanged(final ItemContainerChanged event)
@@ -197,8 +188,7 @@ public class ToolRequiredPlugin extends Plugin
 	@Override
 	public void startUp()
 	{
-		runConfigCheck = hasUnseenUpdates();
-		initializeTracker = 2;
+		versionManager.initialize();
 	}
 
 	@Subscribe
@@ -249,16 +239,16 @@ public class ToolRequiredPlugin extends Plugin
 	{
 		if (event.getGameState() == GameState.LOGGING_IN)
 		{
-			initializeTracker = 2;
+			versionManager.onLogin();
 		}
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick e)
 	{
-		if (runConfigCheck && initializeTracker > 0 && --initializeTracker == 0)
+		if (versionManager.shouldShowMessage())
 		{
-			String updateMessage = buildLoginMessage();
+			String updateMessage = versionManager.buildLoginMessage();
 
 			chatMessageManager.queue(
 				QueuedMessage.builder()
@@ -279,7 +269,7 @@ public class ToolRequiredPlugin extends Plugin
 			return;
 		}
 
-		if (!runConfigCheck)
+		if (!versionManager.isEnabled())
 		{
 			return;
 		}
@@ -320,7 +310,7 @@ public class ToolRequiredPlugin extends Plugin
 
 	protected void click(ScriptEvent ev)
 	{
-		updateLastVersionSeen();
+		versionManager.acknowledge();
 		chatMessageManager.queue(QueuedMessage.builder()
 			.type(ChatMessageType.CONSOLE)
 			.runeLiteFormattedMessage("Acknowledged the changelog.")
@@ -342,57 +332,14 @@ public class ToolRequiredPlugin extends Plugin
 		});
 	}
 
-	public boolean hasUnseenUpdates() 
-	{
-		Double lastVersionSeen = configManager.getConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_SEEN_VERSION, Double.class);
-		lastVersionSeen = lastVersionSeen == null ? 0.0 : lastVersionSeen;
-
-		Double latestVersion = getLatestVersion();
-		
-		// If last seen equals latest in map, no unseen updates - you have told me linkedhashmap preserves insertion order the other day
-		return !latestVersion.equals(lastVersionSeen);
-	}
-
-	public Double getLatestVersion()
-	{
-		// Get the latest version by taking the last key in the map
-		return VERSION_UPDATES.keySet().stream()
-				.reduce((first, second) -> second)
-				.orElse(Double.valueOf(0));
-	}
-
-	public String buildLoginMessage() 
-	{
-		Double lastVersionSeen = Double.parseDouble(ToolRequiredConfig.LAST_SEEN_VERSION);
-		StringBuilder message = new StringBuilder();
-		message.append("Tool Required updated: ");
-
-		for (Map.Entry<Double, String> entry : VERSION_UPDATES.entrySet()) {
-			Double version = entry.getKey();
-			String changeMessage = entry.getValue();
-
-			if (version > lastVersionSeen)
-			{
-				message.append(changeMessage);
-			}
-		}
-
-		// add instruction to acknowledge via config
-		message.append(". Click this message to not see this message again");
-		return message.toString();
-	}
-
-	public void updateLastVersionSeen() 
-	{
-		configManager.setConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_SEEN_VERSION, getLatestVersion());
-		runConfigCheck = false;
-	}
+    public void updateLastVersionSeen()
+    {
+        versionManager.updateLastVersionSeen();
+    }
 
 	@Override
 	public void resetConfiguration()
 	{
-		configManager.setConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_SEEN_VERSION, "0.0");
-		initializeTracker = 2;
-		runConfigCheck = true;
+        versionManager.resetVersionConfig();
 	}
 }
