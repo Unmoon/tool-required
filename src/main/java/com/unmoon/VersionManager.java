@@ -17,7 +17,8 @@ public class VersionManager {
     private static final Map<String, String> VERSION_UPDATES = new LinkedHashMap<>();
 
     static {
-        VERSION_UPDATES.put("1.2.0", "Farming patches functionality added for spade, rake, and magic secateurs");
+        VERSION_UPDATES.put("0.0.0", "Initial Release");
+        VERSION_UPDATES.put("1.2.0", "Farming patches functionality added for magic secateurs");
     }
 
     // State tracking
@@ -57,14 +58,14 @@ public class VersionManager {
 
     public void resetVersionConfig()
     {
-        configManager.setConfiguration("tool-required", "lastVersionSeen", "");
+        configManager.setConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_VERSION_SEEN, "");
         initializeTracker = 2;
         runConfigCheck = true;
     }
 
     public String buildLoginMessage()
     {
-        String lastVersionSeen = config.lastVersionSeen();
+        String lastVersionSeen = ToolRequiredConfig.LAST_VERSION_SEEN;
         StringBuilder message = new StringBuilder();
         message.append("Tool Required updated: ");
         boolean foundLastSeen = lastVersionSeen.isEmpty();
@@ -96,7 +97,7 @@ public class VersionManager {
 
     public boolean hasUnseenUpdates()
     {
-        String lastVersionSeen = config.lastVersionSeen();
+        String lastVersionSeen = ToolRequiredConfig.LAST_VERSION_SEEN;
         String latestVersion = getLatestVersion();
 
         // If last seen equals latest in map, no unseen updates - you have told me linkedhashmap preserves insertion order the other day
@@ -112,6 +113,6 @@ public class VersionManager {
     }
 
     public void updateLastVersionSeen() {
-        configManager.setConfiguration("tool-required", "lastVersionSeen", getLatestVersion());
+        configManager.setConfiguration(ToolRequiredConfig.CONFIG_GROUP, ToolRequiredConfig.LAST_VERSION_SEEN, getLatestVersion());
     }
 }

@@ -9,6 +9,7 @@ import net.runelite.client.config.ConfigItem;
 public interface ToolRequiredConfig extends Config
 {
 	String CONFIG_GROUP = "tool-required";
+        String LAST_VERSION_SEEN = "0.0.0";
 
 	@ConfigItem(
 		keyName = "chopDown",
@@ -31,12 +32,12 @@ public interface ToolRequiredConfig extends Config
 	)
 	default boolean farm() {return true;}
 
-    @ConfigItem(
-            keyName = "lastVersionSeen",
-            name = "Last Version Seen",
-            description = "Last plugin message version acknowledged.",
-            hidden = true
-    )
-    default String lastVersionSeen() {return "";}
+//     @ConfigItem(
+//             keyName = "lastVersionSeen",
+//             name = "Last Version Seen",
+//             description = "Last plugin message version acknowledged.",
+//             hidden = true
+//     )
+//     default String lastVersionSeen() {return "";}
 
 }
