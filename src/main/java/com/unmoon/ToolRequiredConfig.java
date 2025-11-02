@@ -32,12 +32,4 @@ public interface ToolRequiredConfig extends Config
 	)
 	default boolean farm() {return true;}
 
-//     @ConfigItem(
-//             keyName = "lastVersionSeen",
-//             name = "Last Version Seen",
-//             description = "Last plugin message version acknowledged.",
-//             hidden = true
-//     )
-//     default String lastVersionSeen() {return "";}
-
 }
