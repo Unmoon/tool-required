@@ -12,23 +12,23 @@ public interface ToolRequiredConfig extends Config
     String LAST_VERSION_SEEN = "0.0.0";
 
 	@ConfigItem(
-	keyName = "chopDown",
-	name = "Remove Chop down",
-	description = "Remove Chop down option from trees if you have no axe."
+		keyName = "chopDown",
+		name = "Remove Chop down",
+		description = "Remove Chop down option from trees if you have no axe."
 	)
 	default boolean chopDown() {return true;}
 
 	@ConfigItem(
-	keyName = "mine",
-	name = "Remove Mine",
-	description = "Remove Mine option from rocks if you have no pickaxe."
+		keyName = "mine",
+		name = "Remove Mine",
+		description = "Remove Mine option from rocks if you have no pickaxe."
 	)
 	default boolean mine() {return true;}
 
 	@ConfigItem(
-	keyName = "farming",
-	name = "Remove Farming",
-	description = "Remove Pick and Harvest option from relevant patches if you have no magic secateurs."
+		keyName = "farming",
+		name = "Remove Farming",
+		description = "Remove Pick and Harvest option from relevant patches if you have no magic secateurs."
 	)
 	default boolean farm() {return true;}
 
