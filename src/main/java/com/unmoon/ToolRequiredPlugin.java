@@ -124,7 +124,7 @@ public class ToolRequiredPlugin extends Plugin
 	);
 	private final Set<String> cutOverrides = Sets.newHashSet("Sulliuscep");
 	private final Set<String> chopOverrides = Sets.newHashSet(
-			"Jungle Bush", "Pineapple plant", "Canoe Station", "Vines", "Tendrils", "Bruma roots",
+			"Jungle Bush", "Pineapple plant", "Vines", "Tendrils", "Bruma roots",
 			"Rotten sapling", "Sapling", "Thick vine", "Thick vines", "Corrupt Phren Roots", "Phren Roots"
 	);
 
